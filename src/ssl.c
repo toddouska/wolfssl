@@ -25494,6 +25494,10 @@ static int wolfSSL_RAND_InitMutex(void)
 
 #ifdef OPENSSL_EXTRA
 
+#ifdef HAVE_GETPID
+    static pid_t parentPID = 0;  /* to detect fork()'s in RAND_bytes() */
+#endif
+
 /* Checks if the global RNG has been created. If not then one is created.
  *
  * Returns WOLFSSL_SUCCESS when no error is encountered.
@@ -25508,6 +25512,9 @@ int wolfSSL_RAND_Init(void)
             if (ret == 0) {
                 initGlobalRNG = 1;
                 ret = WOLFSSL_SUCCESS;
+                #ifdef HAVE_GETPID
+                    parentPID = getpid();
+                #endif
             }
         }
         else {
@@ -25940,6 +25947,7 @@ int wolfSSL_RAND_pseudo_bytes(unsigned char* buf, int num)
     return ret;
 }
 
+
 /* returns WOLFSSL_SUCCESS if the bytes generated are valid otherwise
  * WOLFSSL_FAILURE */
 int wolfSSL_RAND_bytes(unsigned char* buf, int num)
@@ -25983,8 +25991,22 @@ int wolfSSL_RAND_bytes(unsigned char* buf, int num)
          * have the lock.
          */
         if (initGlobalRNG) {
+
             rng = &globalRNG;
             used_global = 1;
+
+            #ifdef HAVE_GETPID
+                pid_t us = getpid();
+                if (us != parentPID) {
+                    parentPID = us;
+                    ret = wolfSSL_RAND_poll();
+                    if (ret != 0) {
+                        WOLFSSL_MSG("Bad RAND poll");
+                        wc_UnLockMutex(&globalRNGMutex);
+                        return ret;
+                    }
+                }
+            #endif
         }
         else {
             wc_UnLockMutex(&globalRNGMutex);
