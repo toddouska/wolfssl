@@ -26000,11 +26000,12 @@ int wolfSSL_RAND_bytes(unsigned char* buf, int num)
                 if (us != parentPID) {
                     parentPID = us;
                     ret = wolfSSL_RAND_poll();
-                    if (ret != 0) {
+                    if (ret != WOLFSSL_SUCCESS) {
                         WOLFSSL_MSG("Bad RAND poll");
                         wc_UnLockMutex(&globalRNGMutex);
-                        return ret;
+                        return WOLFSSL_FAILURE;
                     }
+                    ret = 0;  /* reset to our good state */
                 }
             #endif
         }
@@ -26076,7 +26077,7 @@ int wolfSSL_RAND_poll(void)
     }
     ret = wc_GenerateSeed(&globalRNG.seed, entropy, entropy_sz);
     if (ret != 0) {
-        WOLFSSL_MSG("Bad wc_RNG_GenerateBlock");
+        WOLFSSL_MSG("Bad wc_GenerateSeed");
         ret = WOLFSSL_FAILURE;
     }
     else {
